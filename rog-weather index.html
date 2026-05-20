@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ROG WEATHER · 台北 桃園 七日預報</title>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&family=Orbitron:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #F2F2F2;
+  --surface: #FFFFFF;
+  --border: #CCCCCC;
+  --border-light: #E0E0E0;
+  --text-1: #111111;
+  --text-2: #444444;
+  --text-3: #888888;
+  --rog-red: #E30000;
+  --rog-red-dim: rgba(227,0,0,0.12);
+  --shadow-sm: 0 2px 8px rgba(0,0,0,0.06);
+  --shadow-md: 0 6px 24px rgba(0,0,0,0.12);
+  --rain-blue: #3A7BD5;
+  --cut: 14px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Rajdhani', 'Microsoft JhengHei', '微軟正黑體', sans-serif;
+  background: var(--bg);
+  background-image:
+    repeating-linear-gradient(0deg, transparent, transparent 48px, rgba(0,0,0,0.025) 48px, rgba(0,0,0,0.025) 49px),
+    repeating-linear-gradient(90deg, transparent, transparent 48px, rgba(0,0,0,0.025) 48px, rgba(0,0,0,0.025) 49px);
+  min-height: 100vh;
+  color: var(--text-1);
+}
+
+/* ─── TYPHOON ALERT ─── */
+#typhoon-alert {
+  display: none;
+  background: #0D0000;
+  border-bottom: 2px solid var(--rog-red);
+  padding: 10px 24px;
+  color: #FF4444;
+  font-family: 'Orbitron', monospace;
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  overflow: hidden;
+  position: relative;
+}
+#typhoon-alert .alert-inner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+#typhoon-alert .alert-icon { font-size: 1rem; animation: blink 1s infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+#typhoon-alert::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -40%;
+  width: 30%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,60,60,0.06), transparent);
+  animation: sweep 3s linear infinite;
+}
+@keyframes sweep { to { left: 110%; } }
+
+/* ─── HEADER ─── */
+header {
+  background: rgba(255,255,255,0.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border-light);
+  padding: 20px 32px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.header-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.brand {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.brand-title {
+  font-family: 'Orbitron', monospace;
+  font-weight: 900;
+  font-size: 1.35rem;
+  color: var(--text-1);
+  letter-spacing: 0.08em;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.brand-title::after {
+  content: '';
+  display: inline-block;
+  width: 28px;
+  height: 2px;
+  background: var(--rog-red);
+}
+.brand-sub {
+  font-size: 0.7rem;
+  color: var(--text-3);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+.header-meta {
+  text-align: right;
+}
+.meta-label {
+  font-size: 0.65rem;
+  letter-spacing: 0.15em;
+  color: var(--text-3);
+  text-transform: uppercase;
+  font-weight: 600;
+}
+.meta-time {
+  font-family: 'Orbitron', monospace;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text-2);
+  letter-spacing: 0.05em;
+  margin-top: 2px;
+}
+.header-refresh {
+  background: none;
+  border: 1px solid var(--border);
+  padding: 6px 14px;
+  font-family: 'Orbitron', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  color: var(--text-3);
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 6px;
+  display: inline-block;
+}
+.header-refresh:hover {
+  border-color: var(--rog-red);
+  color: var(--rog-red);
+}
+
+/* ─── MAIN ─── */
+main {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 36px 24px 60px;
+}
+
+.cities-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 36px;
+  align-items: start;
+}
+
+/* ─── CITY SECTION ─── */
+.city-section {
+  opacity: 0;
+  transform: translateY(16px);
+  animation: fadeUp 0.5s ease forwards;
+}
+.city-section:nth-child(2) { animation-delay: 0.12s; }
+@keyframes fadeUp { to { opacity:1; transform:translateY(0); } }
+
+.city-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-light);
+  position: relative;
+}
+.city-header::after {
+  content: '';
+  position: absolute;
+  bottom: -1px; left: 0;
+  width: 48px; height: 2px;
+  background: var(--rog-red);
+}
+.city-name-en {
+  font-family: 'Orbitron', monospace;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-1);
+  letter-spacing: 0.1em;
+}
+.city-name-zh {
+  font-size: 0.72rem;
+  color: var(--text-3);
+  letter-spacing: 0.1em;
+  margin-top: 2px;
+}
+.city-status {
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  color: var(--text-3);
+  text-transform: uppercase;
+  font-family: 'Rajdhani', sans-serif;
+}
+.city-status.ok { color: #2A9D5C; }
+.city-status.err { color: var(--rog-red); }
+
+/* ─── DAY CARDS ─── */
+.days-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.day-card {
+  background: var(--surface);
+  border: 1px solid var(--border-light);
+  padding: 14px 18px;
+  position: relative;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%);
+  overflow: hidden;
+}
+/* cut corner fill */
+.day-card::after {
+  content: '';
+  position: absolute;
+  top: -1px; right: -1px;
+  border-style: solid;
+  border-width: calc(var(--cut) + 1px) calc(var(--cut) + 1px) 0 0;
+  border-color: var(--bg) transparent transparent transparent;
+}
+/* left accent line */
+.day-card::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0;
+  width: 3px;
+  height: 100%;
+  background: var(--rog-red);
+  transform: scaleY(0);
+  transform-origin: bottom;
+  transition: transform 0.2s ease;
+}
+.day-card:hover {
+  transform: translateX(4px);
+  box-shadow: var(--shadow-md);
+}
+.day-card:hover::before { transform: scaleY(1); }
+
+.day-card.today {
+  background: linear-gradient(135deg, #FEFEFE 0%, #F8F8F8 100%);
+  border-color: #C0C0C0;
+}
+.day-card.today::before { transform: scaleY(1); }
+
+.card-row {
+  display: grid;
+  grid-template-columns: 72px 1fr 64px 90px;
+  align-items: center;
+  gap: 10px;
+}
+
+.col-day {}
+.day-label {
+  font-family: 'Orbitron', monospace;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--text-3);
+  text-transform: uppercase;
+}
+.day-card.today .day-label { color: var(--rog-red); }
+.day-date-num {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-1);
+  line-height: 1.15;
+}
+.day-dow-zh {
+  font-size: 0.72rem;
+  color: var(--text-3);
+  font-weight: 400;
+}
+
+.col-weather {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.w-emoji {
+  font-size: 1.7rem;
+  line-height: 1;
+  flex-shrink: 0;
+  filter: drop-shadow(0 1px 3px rgba(0,0,0,0.08));
+}
+.w-desc {
+  font-size: 0.82rem;
+  color: var(--text-2);
+  font-weight: 500;
+  line-height: 1.3;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.col-temp {
+  text-align: center;
+}
+.temp-hi {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-1);
+  line-height: 1;
+}
+.temp-sep { font-size: 0.65rem; color: var(--text-3); margin: 1px 0; }
+.temp-lo {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-3);
+}
+
+.col-rain {}
+.rain-label {
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  color: var(--text-3);
+  text-transform: uppercase;
+  margin-bottom: 3px;
+  font-weight: 600;
+}
+.rain-pct {
+  font-family: 'Orbitron', monospace;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-2);
+  margin-bottom: 5px;
+}
+.rain-track {
+  height: 3px;
+  background: #E4E4E4;
+  position: relative;
+  overflow: hidden;
+}
+.rain-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #5B9FE3, #2060B8);
+  position: relative;
+  transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.rain-fill.high { background: linear-gradient(90deg, #3A7BD5, #1040A0); }
+.rain-fill.very-high { background: linear-gradient(90deg, #2255BB, #0D2878); }
+
+/* ─── LOADING SKELETON ─── */
+.skeleton-card {
+  height: 62px;
+  background: linear-gradient(90deg, #EBEBEB 25%, #D8D8D8 50%, #EBEBEB 75%);
+  background-size: 400% 100%;
+  animation: shimmer 1.4s ease infinite;
+  clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%);
+}
+@keyframes shimmer {
+  0%   { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+/* ─── ERROR / EMPTY ─── */
+.error-msg {
+  padding: 20px;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-3);
+  border: 1px dashed var(--border);
+  letter-spacing: 0.05em;
+}
+
+/* ─── DECORATIVE CORNER ─── */
+.deco-corner {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  opacity: 0.1;
+  pointer-events: none;
+  width: 56px;
+  height: 56px;
+}
+
+/* ─── FOOTER ─── */
+footer {
+  border-top: 1px solid var(--border-light);
+  padding: 18px 24px;
+  text-align: center;
+  font-size: 0.68rem;
+  color: var(--text-3);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* ─── RESPONSIVE ─── */
+@media (max-width: 760px) {
+  .cities-grid { grid-template-columns: 1fr; gap: 28px; }
+  header { padding: 14px 16px; }
+  main { padding: 24px 14px 48px; }
+  .card-row { grid-template-columns: 60px 1fr 52px 72px; gap: 8px; }
+  .w-emoji { font-size: 1.4rem; }
+  .brand-title { font-size: 1.05rem; }
+}
+@media (max-width: 440px) {
+  .card-row { grid-template-columns: 54px 1fr 50px 68px; gap: 6px; }
+  .w-desc { font-size: 0.75rem; }
+}
+</style>
+</head>
+<body>
+
+<!-- Typhoon Alert -->
+<div id="typhoon-alert">
+  <div class="alert-inner">
+    <span class="alert-icon">⚠</span>
+    <span>TYPHOON WARNING ／ 颱風警報</span>
+    <span id="typhoon-msg" style="opacity:0.8"></span>
+  </div>
+</div>
+
+<!-- Header -->
+<header>
+  <div class="header-inner">
+    <div class="brand">
+      <div class="brand-title">ROG WEATHER</div>
+      <div class="brand-sub">TAIPEI &nbsp;·&nbsp; TAOYUAN &nbsp;·&nbsp; 5-DAY FORECAST</div>
+    </div>
+    <div class="header-meta">
+      <div class="meta-label">最後更新</div>
+      <div class="meta-time" id="update-time">—</div>
+      <button class="header-refresh" onclick="initAll()">↻ &nbsp;REFRESH</button>
+    </div>
+  </div>
+</header>
+
+<!-- Main -->
+<main>
+  <div class="cities-grid">
+    <!-- Taipei -->
+    <div class="city-section">
+      <div class="city-header">
+        <div>
+          <div class="city-name-en">TAIPEI</div>
+          <div class="city-name-zh">台北市 · 中正區</div>
+        </div>
+        <div class="city-status" id="taipei-status">載入中...</div>
+      </div>
+      <div class="days-list" id="taipei-days"></div>
+    </div>
+
+    <!-- Taoyuan -->
+    <div class="city-section">
+      <div class="city-header">
+        <div>
+          <div class="city-name-en">TAOYUAN</div>
+          <div class="city-name-zh">桃園市 · 桃園區</div>
+        </div>
+        <div class="city-status" id="taoyuan-status">載入中...</div>
+      </div>
+      <div class="days-list" id="taoyuan-days"></div>
+    </div>
+  </div>
+</main>
+
+<!-- Deco -->
+<div class="deco-corner">
+  <svg viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="1" y="1" width="54" height="54" stroke="#000" stroke-width="1.2"/>
+    <rect x="14" y="14" width="28" height="28" stroke="#000" stroke-width="1"/>
+    <line x1="0" y1="28" x2="14" y2="28" stroke="#000" stroke-width="1"/>
+    <line x1="42" y1="28" x2="56" y2="28" stroke="#000" stroke-width="1"/>
+    <line x1="28" y1="0" x2="28" y2="14" stroke="#000" stroke-width="1"/>
+    <line x1="28" y1="42" x2="28" y2="56" stroke="#000" stroke-width="1"/>
+    <circle cx="28" cy="28" r="4" stroke="#000" stroke-width="1"/>
+  </svg>
+</div>
+
+<footer>
+  DATA SOURCE: 中央氣象署開放資料平臺 &nbsp;·&nbsp; ROG WEATHER SYSTEM &nbsp;·&nbsp; PERSONAL USE
+</footer>
+
+<script>
+const API_KEY = 'CWA-73C13AA6-6D4D-4BB8-9781-C73D21B8F57F';
+const BASE = 'https://opendata.cwa.gov.tw/api/v1/rest/datastore';
+
+// 不帶 elementName，取全部元素，避免英文代號不符的問題
+const ENDPOINTS = {
+  taipei:  `${BASE}/F-D0047-061?Authorization=${API_KEY}&locationName=中正區`,
+  taoyuan: `${BASE}/F-D0047-005?Authorization=${API_KEY}&locationName=桃園區`
+};
+
+const WEEK_EN = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+const WEEK_ZH = ['日','一','二','三','四','五','六'];
+
+/* ── 天氣 emoji ── */
+function getEmoji(wx) {
+  if (!wx) return '🌤';
+  if (wx.includes('雷')) return '⛈';
+  if (wx.includes('豪雨') || wx.includes('暴雨')) return '🌧';
+  if (wx.includes('大雨')) return '🌧';
+  if (wx.includes('雨') && wx.includes('短暫')) return '🌦';
+  if (wx.includes('雨') && wx.includes('陣'))   return '🌦';
+  if (wx.includes('雨')) return '🌧';
+  if (wx.includes('陰')) return '☁';
+  if (wx.includes('多雲') && wx.includes('晴')) return '⛅';
+  if (wx.includes('多雲')) return '🌥';
+  if (wx.includes('晴')) return '☀';
+  if (wx.includes('霧')) return '🌫';
+  return '🌤';
+}
+
+function getRainClass(pct) {
+  if (pct >= 70) return 'very-high';
+  if (pct >= 40) return 'high';
+  return '';
+}
+
+/* ── 從 records 取出第一筆 location（支援大小寫兩種 API 格式） ── */
+function extractFirstLocation(json) {
+  const r = json?.records || {};
+
+  // 新版 API：PascalCase  Locations[].Location[]
+  const A = r.Locations;
+  if (Array.isArray(A) && A.length) {
+    const locs = A[0].Location;
+    if (Array.isArray(locs) && locs.length) return locs[0];
+    if (locs && !Array.isArray(locs)) return locs;
+  }
+
+  // 舊版 API：camelCase  locations[].location[]
+  const B = r.locations;
+  if (Array.isArray(B) && B.length) {
+    const locs = B[0].location || B[0].Location;
+    if (Array.isArray(locs) && locs.length) return locs[0];
+    if (locs && !Array.isArray(locs)) return locs;
+  }
+
+  // 直接 location / Location
+  const C = r.location || r.Location;
+  if (Array.isArray(C) && C.length) return C[0];
+  if (C && !Array.isArray(C)) return C;
+
+  return null;
+}
+
+/* ── 從時間物件取日期字串 YYYY-MM-DD ── */
+function getDate(t) {
+  const dt = t.DataTime || t.dataTime || t.startTime || t.StartTime || '';
+  return (dt.split('T')[0] || dt.split(' ')[0]).slice(0, 10);
+}
+
+/* ── 從時間物件取小時數 ── */
+function getHour(t) {
+  const dt = t.DataTime || t.dataTime || t.startTime || t.StartTime || '';
+  const part = dt.includes('T') ? dt.split('T')[1] : (dt.split(' ')[1] || '');
+  return parseInt(part) || 0;
+}
+
+/* ── 從 ElementValue 陣列取第一個有意義的值 ── */
+function getVal(evArr) {
+  if (!Array.isArray(evArr) || !evArr.length) return null;
+  const ev = evArr[0];
+  // 新版 API：key 是欄位名稱，如 {Temperature:"23"} {Weather:"晴"} 等
+  // 舊版 API：{value:"23", measures:"..."}
+  return ev.value
+      ?? ev.Value
+      ?? ev.Temperature
+      ?? ev.Weather
+      ?? ev.MaxTemperature
+      ?? ev.MinTemperature
+      ?? ev.ProbabilityOfPrecipitation
+      ?? ev.WindSpeed
+      ?? Object.values(ev).find(v => v !== undefined && v !== '');
+}
+
+/* ── 解析 location 物件，回傳 7 天資料陣列 ── */
+function parseDays(loc) {
+  // 支援大小寫
+  const rawElements = loc.WeatherElement || loc.weatherElement || [];
+  const elMap = {};
+  rawElements.forEach(el => {
+    const name = el.ElementName || el.elementName || '';
+    elMap[name] = el.Time || el.time || [];
+  });
+
+  // 印出所有可用元素名稱，方便排查
+  console.log('%c[parseDays] 所有元素名稱:', 'color:cyan;font-weight:bold', Object.keys(elMap).join(' | '));
+
+  const days = {};
+  const add = date => { if (!days[date]) days[date] = { date, maxT:null, minT:null, wx:null, pop:null }; };
+
+  // ── 最高溫度 ──
+  const maxEl = elMap['MaxT'] || elMap['最高溫度'] || [];
+  maxEl.forEach(t => {
+    const d = getDate(t); if (!d) return; add(d);
+    const v = getVal(t.ElementValue || t.elementValue);
+    if (v && v !== '-99') days[d].maxT = v;
+  });
+
+  // ── 最低溫度 ──
+  const minEl = elMap['MinT'] || elMap['最低溫度'] || [];
+  minEl.forEach(t => {
+    const d = getDate(t); if (!d) return; add(d);
+    const v = getVal(t.ElementValue || t.elementValue);
+    if (v && v !== '-99') days[d].minT = v;
+  });
+
+  // ── 若沒有最高/最低，從逐時「溫度」推算 ──
+  if (!maxEl.length) {
+    const tempEl = elMap['溫度'] || elMap['T'] || [];
+    const byDay = {};
+    tempEl.forEach(t => {
+      const d = getDate(t);
+      const v = parseFloat(getVal(t.ElementValue || t.elementValue));
+      if (!d || isNaN(v)) return;
+      (byDay[d] = byDay[d] || []).push(v);
+    });
+    Object.entries(byDay).forEach(([d, arr]) => {
+      add(d);
+      days[d].maxT = String(Math.max(...arr));
+      days[d].minT = String(Math.min(...arr));
+    });
+  }
+
+  // ── 天氣現象 ──
+  const wxEl = elMap['Wx'] || elMap['天氣現象'] || [];
+  wxEl.forEach(t => {
+    const d = getDate(t); const h = getHour(t);
+    if (!d) return; add(d);
+    const v = getVal(t.ElementValue || t.elementValue);
+    if (v && v !== '-99') {
+      if (days[d].wx === null || (h >= 6 && h < 18)) days[d].wx = v;
+    }
+  });
+
+  // ── 降雨機率 ──
+  const popEl = elMap['3小時降雨機率']
+           || elMap['6小時降雨機率']
+           || elMap['12小時降雨機率']
+           || elMap['降雨機率']
+           || elMap['PoP12h']
+           || elMap['PoP']
+           || [];
+  popEl.forEach(t => {
+    const d = getDate(t); if (!d) return; add(d);
+    const v = parseInt(getVal(t.ElementValue || t.elementValue));
+    if (!isNaN(v) && v >= 0) {
+      if (days[d].pop === null || v > days[d].pop) days[d].pop = v;
+    }
+  });
+
+  return Object.values(days)
+    .filter(d => d.date)
+    .sort((a,b) => a.date < b.date ? -1 : 1)
+    .slice(0, 5);
+}
+
+/* ── Skeleton ── */
+function renderSkeleton(id) {
+  document.getElementById(id).innerHTML =
+    Array(7).fill('<div class="skeleton-card"></div>').join('');
+}
+
+/* ── 渲染每日卡片 ── */
+function renderDays(id, days) {
+  const todayStr = new Date().toISOString().split('T')[0];
+  document.getElementById(id).innerHTML = days.map((day, i) => {
+    const d    = new Date(day.date + 'T08:00:00');
+    const dow  = d.getDay();
+    const mm   = d.getMonth() + 1;
+    const dd   = d.getDate();
+    const isToday = day.date === todayStr;
+    const emoji   = getEmoji(day.wx);
+    const pop     = day.pop !== null ? day.pop : null;
+    const popDisplay = pop !== null ? pop + '%' : '—';
+    const popW    = pop !== null ? pop : 0;
+    const rc      = pop !== null ? getRainClass(pop) : '';
+
+    return `<div class="day-card${isToday ? ' today' : ''}" style="animation: fadeUp 0.4s ease ${i * 0.06}s both">
+  <div class="card-row">
+    <div class="col-day">
+      <div class="day-label">${isToday ? 'TODAY' : WEEK_EN[dow]}</div>
+      <div class="day-date-num">${mm}/${String(dd).padStart(2,'0')}</div>
+      <div class="day-dow-zh">（${WEEK_ZH[dow]}）</div>
+    </div>
+    <div class="col-weather">
+      <span class="w-emoji">${emoji}</span>
+      <span class="w-desc">${day.wx || '—'}</span>
+    </div>
+    <div class="col-temp">
+      <div class="temp-hi">${day.maxT ?? '—'}°</div>
+      <div class="temp-sep">──</div>
+      <div class="temp-lo">${day.minT ?? '—'}°</div>
+    </div>
+    <div class="col-rain">
+      <div class="rain-label">降雨機率</div>
+      <div class="rain-pct">${popDisplay}</div>
+      <div class="rain-track">
+        <div class="rain-fill ${rc}" style="width:${popW}%"></div>
+      </div>
+    </div>
+  </div>
+</div>`;
+  }).join('');
+}
+
+/* ── 錯誤狀態 ── */
+function renderError(id) {
+  document.getElementById(id).innerHTML =
+    '<div class="error-msg">⚠ &nbsp; 資料載入失敗，請重新整理</div>';
+}
+
+function setStatus(id, ok) {
+  const el = document.getElementById(id);
+  el.textContent = ok ? 'LIVE · DATA OK' : 'ERROR · NO DATA';
+  el.className = 'city-status ' + (ok ? 'ok' : 'err');
+}
+
+/* ── 颱風偵測（從天氣描述文字判斷，不呼叫外部 API） ── */
+function checkTyphoonFromWeatherText(days) {
+  const kw = ['颱風','台風','熱帶風暴','海上颱風警報','陸上颱風警報'];
+  if (days.some(d => d.wx && kw.some(k => d.wx.includes(k)))) {
+    document.getElementById('typhoon-alert').style.display = 'block';
+    document.getElementById('typhoon-msg').textContent = '· 天氣資料含颱風相關資訊，請注意安全';
+  }
+}
+
+/* ── 主要抓取流程 ── */
+async function fetchCity(endpoint, daysId, statusId) {
+  renderSkeleton(daysId);
+  try {
+    const res = await fetch(endpoint);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const json = await res.json();
+
+    const loc = extractFirstLocation(json);
+    if (!loc) {
+      console.error('[' + daysId + '] structure dump:', JSON.stringify(json?.records || {}).slice(0, 600));
+      throw new Error('Location not found');
+    }
+
+    console.log('[' + daysId + '] district:', loc.LocationName || loc.locationName);
+    const days = parseDays(loc);
+    if (!days.length) throw new Error('No days parsed');
+
+    renderDays(daysId, days);
+    setStatus(statusId, true);
+    if (daysId === 'taipei-days') checkTyphoonFromWeatherText(days);
+  } catch (e) {
+    console.error('[' + daysId + ']', e.message);
+    renderError(daysId);
+    setStatus(statusId, false);
+  }
+}
+
+/* ── 時間戳記 ── */
+function updateClock() {
+  const n = new Date(), p = x => String(x).padStart(2,'0');
+  document.getElementById('update-time').textContent =
+    `${n.getFullYear()}.${p(n.getMonth()+1)}.${p(n.getDate())}  ${p(n.getHours())}:${p(n.getMinutes())}`;
+}
+
+function initAll() {
+  updateClock();
+  fetchCity(ENDPOINTS.taipei,  'taipei-days',  'taipei-status');
+  fetchCity(ENDPOINTS.taoyuan, 'taoyuan-days', 'taoyuan-status');
+}
+
+initAll();
+</script>
+</body>
+</html>
